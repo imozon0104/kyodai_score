@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>京大文系 得点換算シミュレーター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=BIZ+UDGothic:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0f13;
+    --surface: #16181f;
+    --surface2: #1e2029;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #e8e9ed;
+    --muted: #7a7d8a;
+    --accent: #c8a96e;
+    --accent2: #8eb4e3;
+    --red: #e05c5c;
+    --amber: #e0a44a;
+    --green: #5caa7f;
+    --blue: #5b8fcf;
+    --purple: #8b7dd4;
+    --serif: 'Noto Serif JP', serif;
+    --sans: 'BIZ UDGothic', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  .noise {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; padding: 0 20px 60px; }
+
+  header {
+    padding: 48px 0 36px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 36px;
+  }
+  .header-badge {
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: .12em;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 3px 10px;
+    border-radius: 2px;
+    margin-bottom: 14px;
+    font-family: var(--sans);
+  }
+  header h1 {
+    font-family: var(--serif);
+    font-size: clamp(22px, 4vw, 34px);
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 10px;
+  }
+  header p {
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 520px;
+    line-height: 1.7;
+  }
+
+  .layout { display: grid; grid-template-columns: 260px 1fr; gap: 24px; align-items: start; }
+
+  .input-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    position: sticky;
+    top: 20px;
+  }
+
+  .panel-section { margin-bottom: 24px; }
+  .panel-section:last-child { margin-bottom: 0; }
+
+  .panel-title {
+    font-size: 10px;
+    letter-spacing: .14em;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .field { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+  .field label { font-size: 12px; color: var(--muted); flex: 1; min-width: 0; }
+  .field input[type="number"] {
+    width: 62px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 5px 8px;
+    text-align: right;
+    transition: border-color .15s;
+    -moz-appearance: textfield;
+  }
+  .field input[type="number"]::-webkit-inner-spin-button,
+  .field input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .field input[type="number"]:focus { outline: none; border-color: var(--accent); }
+  .field .max { font-size: 11px; color: var(--muted); width: 44px; flex-shrink: 0; }
+
+  .eigo-conv {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+    margin: -4px 0 8px;
+    padding-right: 2px;
+  }
+  .eigo-conv span { color: var(--accent2); font-weight: 700; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  .results { display: flex; flex-direction: column; gap: 16px; }
+
+  .dept-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 22px;
+    transition: border-color .2s;
+    animation: fadeIn .3s ease both;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .dept-card:hover { border-color: var(--border2); }
+
+  .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .dept-name {
+    font-family: var(--serif);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .badge {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 2px;
+    letter-spacing: .04em;
+    font-weight: 700;
+  }
+  .badge-top    { background: rgba(91,143,207,.2); color: var(--blue); border: 1px solid rgba(91,143,207,.4); }
+  .badge-pass   { background: rgba(92,170,127,.2); color: var(--green); border: 1px solid rgba(92,170,127,.4); }
+  .badge-close  { background: rgba(224,164,74,.2); color: var(--amber); border: 1px solid rgba(224,164,74,.4); }
+  .badge-fail   { background: rgba(224,92,92,.2); color: var(--red); border: 1px solid rgba(224,92,92,.4); }
+
+  .scores-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .score-cell { background: var(--surface2); border-radius: 5px; padding: 10px 12px; }
+  .score-cell .label { font-size: 10px; color: var(--muted); margin-bottom: 4px; letter-spacing: .06em; }
+  .score-cell .value { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1; }
+  .score-cell .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .score-cell.total .value { font-size: 26px; color: var(--accent); }
+
+  .bar-area { margin-bottom: 12px; }
+  .bar-track {
+    position: relative;
+    height: 32px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .bar-seg { position: absolute; top: 0; height: 100%; transition: width .4s cubic-bezier(.4,0,.2,1); }
+  .bar-seg.b-max  { background: rgba(92,170,127,.25); }
+  .bar-seg.b-avg  { background: rgba(224,164,74,.3); }
+  .bar-seg.b-min  { background: rgba(224,92,92,.3); }
+  .bar-seg.b-you  { background: rgba(91,143,207,.7); border-radius: 0 3px 3px 0; }
+  .bar-line {
+    position: absolute; top: 0; width: 2px; height: 100%;
+    display: flex; align-items: center;
+  }
+  .bar-line.l-min { background: var(--red); }
+  .bar-line.l-avg { background: var(--amber); }
+  .bar-line.l-max { background: var(--green); }
+
+  .bar-labels { display: flex; gap: 14px; flex-wrap: wrap; }
+  .bar-lbl { font-size: 11px; display: flex; align-items: center; gap: 4px; }
+  .bar-lbl-dot { width: 8px; height: 8px; border-radius: 1px; flex-shrink: 0; }
+  .bar-lbl-text { color: var(--muted); }
+  .bar-lbl-val { color: var(--text); font-weight: 700; margin-left: 2px; }
+
+  .diff-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    font-size: 11px;
+  }
+  .diff-cell { background: var(--surface2); border-radius: 4px; padding: 7px 10px; }
+  .diff-cell .dlabel { color: var(--muted); margin-bottom: 2px; }
+  .diff-cell .dval { font-weight: 700; font-size: 13px; }
+  .diff-cell .dval.pos { color: var(--green); }
+  .diff-cell .dval.neg { color: var(--red); }
+  .diff-cell .dval.zero { color: var(--muted); }
+
+  .card-note {
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 6px 10px;
+    border-left: 2px solid var(--border2);
+    line-height: 1.6;
+  }
+
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 16px;
+    font-size: 11px; color: var(--muted);
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  @media (max-width: 680px) {
+    .layout { grid-template-columns: 1fr; }
+    .input-panel { position: static; }
+    .scores-row { grid-template-columns: 1fr 1fr; }
+    .score-cell.total { grid-column: 1/-1; }
+    .diff-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="wrap">
+
+  <header>
+    <div class="header-badge">2025年度〜 新課程入試対応</div>
+    <h1>京都大学 文系学部<br>得点換算シミュレーター</h1>
+    <p>共通テスト・二次試験の得点を入力すると、各文系学部の配点に換算してリアルタイムで表示します。合格者の最高点・平均点・最低点との比較も確認できます。</p>
+  </header>
+
+  <div class="layout">
+
+    <div class="input-panel">
+      <div class="panel-section">
+        <div class="panel-title">共通テスト</div>
+
+        <div class="field">
+          <label>国語</label>
+          <input type="number" id="k-kokugo" min="0" max="200" value="0" oninput="clamp(this,200);calc()">
+          <span class="max">/ 200</span>
+        </div>
+        <div class="field">
+          <label>地歴公民</label>
+          <input type="number" id="k-chiri" min="0" max="200" value="0" oninput="clamp(this,200);calc()">
+          <span class="max">/ 200</span>
+        </div>
+        <div class="field">
+          <label>数学（ⅠA＋ⅡBC）</label>
+          <input type="number" id="k-suugaku" min="0" max="200" value="0" oninput="clamp(this,200);calc()">
+          <span class="max">/ 200</span>
+        </div>
+        <div class="field">
+          <label>理科</label>
+          <input type="number" id="k-rika" min="0" max="100" value="0" oninput="clamp(this,100);calc()">
+          <span class="max">/ 100</span>
+        </div>
+        <div class="field">
+          <label>外国語 R</label>
+          <input type="number" id="k-eigo-r" min="0" max="100" value="0" oninput="clamp(this,100);calc()">
+          <span class="max">/ 100</span>
+        </div>
+        <div class="field">
+          <label>外国語 L</label>
+          <input type="number" id="k-eigo-l" min="0" max="100" value="0" oninput="clamp(this,100);calc()">
+          <span class="max">/ 100</span>
+        </div>
+        <div class="eigo-conv">換算後: <span id="eigo-conv">0</span> / 200点</div>
+        <div class="field">
+          <label>情報Ⅰ</label>
+          <input type="number" id="k-joho" min="0" max="100" value="0" oninput="clamp(this,100);calc()">
+          <span class="max">/ 100</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="panel-section">
+        <div class="panel-title">二次試験</div>
+        <div class="field">
+          <label>国語</label>
+          <input type="number" id="n-kokugo" min="0" max="150" value="0" oninput="clamp(this,150);calc()">
+          <span class="max">/ 150</span>
+        </div>
+        <div class="field">
+          <label>地歴</label>
+          <input type="number" id="n-chiri" min="0" max="100" value="0" oninput="clamp(this,100);calc()">
+          <span class="max">/ 100</span>
+        </div>
+        <div class="field">
+          <label>数学</label>
+          <input type="number" id="n-suugaku" min="0" max="150" value="0" oninput="clamp(this,150);calc()">
+          <span class="max">/ 150</span>
+        </div>
+        <div class="field">
+          <label>外国語</label>
+          <input type="number" id="n-eigo" min="0" max="150" value="0" oninput="clamp(this,150);calc()">
+          <span class="max">/ 150</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:rgba(224,92,92,.5)"></span>最低点</span>
+        <span class="legend-item"><span class="legend-dot" style="background:rgba(224,164,74,.5)"></span>平均点</span>
+        <span class="legend-item"><span class="legend-dot" style="background:rgba(92,170,127,.4)"></span>最高点</span>
+        <span class="legend-item"><span class="legend-dot" style="background:rgba(91,143,207,.7)"></span>あなたの得点</span>
+      </div>
+      <div class="results" id="results"></div>
+    </div>
+  </div>
+
+  <footer>
+    ※ 一般選抜（前期日程）の配点に基づく換算です。外国語はリーディング×1.5＋リスニング×0.5で200点換算。<br>
+    ※ 比較データは旧課程（2024年度以前）の合格者成績です。新課程入試の実際のラインとは異なる場合があります。<br>
+    ※ 本ツールは参考用です。正確な情報は必ず京都大学公式サイトでご確認ください。
+  </footer>
+</div>
+
+<script>
+const REF = {
+  sogo:  { max: 825, high: 637.33, low: 530.50, avg: 564.20 },
+  bun:   { max: 750, high: 638.46, low: 488.25, avg: 518.97 },
+  kyoiku:{ max: 915, high: 659.55, low: 564.66, avg: 598.22 },
+  ho:    { max: 885, high: 734.91, low: 558.08, avg: 601.63 },
+  keizai:{ max: 850, high: 696.62, low: 555.75, avg: 594.27 },
+};
+
+function clamp(el, max) {
+  let v = parseInt(el.value) || 0;
+  if (v < 0) v = 0;
+  if (v > max) v = max;
+  el.value = v;
+}
+function getVal(id) { return parseInt(document.getElementById(id).value) || 0; }
+
+function badge(score, ref) {
+  if (score >= ref.high) return '<span class="badge badge-top">最高点超え</span>';
+  if (score >= ref.avg)  return '<span class="badge badge-pass">平均点以上</span>';
+  if (score >= ref.low)  return '<span class="badge badge-close">最低点以上</span>';
+  return '<span class="badge badge-fail">最低点未満</span>';
+}
+
+function diffStr(score, val) {
+  const d = Math.round((score - val) * 10) / 10;
+  const cls = d > 0 ? 'pos' : d < 0 ? 'neg' : 'zero';
+  const sign = d > 0 ? '+' : '';
+  return { cls, text: sign + d };
+}
+
+function calc() {
+  const kK  = getVal('k-kokugo');
+  const kC  = getVal('k-chiri');
+  const kS  = getVal('k-suugaku');
+  const kR  = getVal('k-rika');
+  const kER = getVal('k-eigo-r');
+  const kEL = getVal('k-eigo-l');
+  const kJ  = getVal('k-joho');
+  const nK  = getVal('n-kokugo');
+  const nC  = getVal('n-chiri');
+  const nS  = getVal('n-suugaku');
+  const nE  = getVal('n-eigo');
+
+  const kEconv = Math.round(kER * 1.5 + kEL * 0.5);
+  document.getElementById('eigo-conv').textContent = kEconv;
+
+  const kK50 = Math.round(kK     * 50 / 200);
+  const kC50 = Math.round(kC     * 50 / 200);
+  const kS50 = Math.round(kS     * 50 / 200);
+  const kR50 = Math.round(kR     * 50 / 100);
+  const kE50 = Math.round(kEconv * 50 / 200);
+  const kJ15 = Math.round(kJ     * 15 / 100);
+  const kJ25 = Math.round(kJ     * 25 / 100);
+  const kJ50 = Math.round(kJ     * 50 / 100);
+
+  const kJ50_ho = Math.round(kJ * 50 / 100);
+  const ho_950  = kK + kC + kS + kEconv + kR + kJ50_ho;
+  const ho_kyotsu = Math.round(ho_950 * 0.3);
+
+  const sogo_niji  = nK + nC + Math.round(nS * 200/150) + Math.round(nE * 200/150);
+  const bun_niji   = nK + nC + Math.round(nS * 100/150) + nE;
+  const kyo_niji   = Math.round(nK * 200/150) + nC + nS + Math.round(nE * 200/150);
+  const ho_niji    = nK + nC + nS + Math.round(nE * 200/150);
+  const kei_niji   = nK + nC + nS + nE;
+
+  const depts = [
+    { name: '総合人間学部（文系）', key: 'sogo',
+      kyotsuScore: kC50 + kR50*2 + kJ25, kyotsuMax: 175,
+      nijiScore: sogo_niji, nijiMax: 650,
+      note: '共通テストの国語・数学・外国語は第1段階選抜（足切り）のみに使用' },
+    { name: '文学部', key: 'bun',
+      kyotsuScore: Math.round((kK50+kC50+kS50+kR50+kE50+kJ15)*250/265), kyotsuMax: 250,
+      nijiScore: bun_niji, nijiMax: 500, note: '' },
+    { name: '教育学部（文系）', key: 'kyoiku',
+      kyotsuScore: kK50+kC50+kS50+kR50+kE50+kJ15, kyotsuMax: 265,
+      nijiScore: kyo_niji, nijiMax: 650, note: '' },
+    { name: '法学部', key: 'ho',
+      kyotsuScore: ho_kyotsu, kyotsuMax: 285,
+      nijiScore: ho_niji, nijiMax: 600,
+      note: '情報を50点換算後、素点合計950点 × 0.3 = 285点満点' },
+    { name: '経済学部（文系）', key: 'keizai',
+      kyotsuScore: kK50+kC50+kS50+kR50+kE50+kJ50, kyotsuMax: 300,
+      nijiScore: kei_niji, nijiMax: 550, note: '' },
+  ];
+
+  const html = depts.map(d => {
+    const total = d.kyotsuScore + d.nijiScore;
+    const ref = REF[d.key];
+    const m = ref.max;
+    const minPct = Math.round(ref.low  / m * 100);
+    const avgPct = Math.round(ref.avg  / m * 100);
+    const maxPct = Math.round(ref.high / m * 100);
+    const youPct = Math.min(Math.round(total / m * 100), 100);
+    const pct = Math.round(total / m * 100);
+
+    const dMin = diffStr(total, ref.low);
+    const dAvg = diffStr(total, ref.avg);
+    const dMax = diffStr(total, ref.high);
+
+    return `<div class="dept-card">
+      <div class="card-top">
+        <span class="dept-name">${d.name}</span>
+        ${badge(total, ref)}
+      </div>
+      <div class="scores-row">
+        <div class="score-cell">
+          <div class="label">共通テスト</div>
+          <div class="value">${d.kyotsuScore}</div>
+          <div class="sub">/ ${d.kyotsuMax}点</div>
+        </div>
+        <div class="score-cell">
+          <div class="label">二次試験</div>
+          <div class="value">${d.nijiScore}</div>
+          <div class="sub">/ ${d.nijiMax}点</div>
+        </div>
+        <div class="score-cell total">
+          <div class="label">合計</div>
+          <div class="value">${total}</div>
+          <div class="sub">/ ${ref.max}点（${pct}%）</div>
+        </div>
+      </div>
+      <div class="bar-area">
+        <div class="bar-track">
+          <div class="bar-seg b-max" style="width:${maxPct}%"></div>
+          <div class="bar-seg b-avg" style="width:${avgPct}%"></div>
+          <div class="bar-seg b-min" style="width:${minPct}%"></div>
+          <div class="bar-seg b-you" style="width:${youPct}%"></div>
+          <div class="bar-line l-min" style="left:${minPct}%"></div>
+          <div class="bar-line l-avg" style="left:${avgPct}%"></div>
+          <div class="bar-line l-max" style="left:${maxPct}%"></div>
+        </div>
+        <div class="bar-labels">
+          <span class="bar-lbl"><span class="bar-lbl-dot" style="background:rgba(224,92,92,.7)"></span><span class="bar-lbl-text">最低点</span><span class="bar-lbl-val">${ref.low}</span></span>
+          <span class="bar-lbl"><span class="bar-lbl-dot" style="background:rgba(224,164,74,.7)"></span><span class="bar-lbl-text">平均点</span><span class="bar-lbl-val">${ref.avg}</span></span>
+          <span class="bar-lbl"><span class="bar-lbl-dot" style="background:rgba(92,170,127,.7)"></span><span class="bar-lbl-text">最高点</span><span class="bar-lbl-val">${ref.high}</span></span>
+        </div>
+      </div>
+      <div class="diff-row">
+        <div class="diff-cell">
+          <div class="dlabel">vs 最低点</div>
+          <div class="dval ${dMin.cls}">${dMin.text}</div>
+        </div>
+        <div class="diff-cell">
+          <div class="dlabel">vs 平均点</div>
+          <div class="dval ${dAvg.cls}">${dAvg.text}</div>
+        </div>
+        <div class="diff-cell">
+          <div class="dlabel">vs 最高点</div>
+          <div class="dval ${dMax.cls}">${dMax.text}</div>
+        </div>
+      </div>
+      ${d.note ? `<div class="card-note">${d.note}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('results').innerHTML = html;
+}
+
+calc();
+</script>
+</body>
+</html>
